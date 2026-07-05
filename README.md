@@ -1,0 +1,243 @@
+# PDF Image Extractor
+
+Extract images from PDF files with intelligent filtering to remove decorative elements, icons, and backgrounds.
+
+## Features
+
+- **Smart filtering**: Automatically excludes decorative icons, ornaments, and background images
+- **Configurable thresholds**: Adjust size, ratio, and margin filters to your needs
+- **Vision model support**: Optional AI-powered filtering using OpenAI GPT-4 Vision
+- **Structured results**: Get detailed metadata for each extracted image
+- **Zero dependencies**: Only requires PyMuPDF (no Django, no frameworks)
+
+## Installation
+
+```bash
+pip install pdf-image-extractor
+
+# With OpenAI vision model support
+pip install pdf-image-extractor[vision]
+
+# With Dashscope (Qwen3-VL-Plus) support
+pip install pdf-image-extractor[dashscope]
+```
+
+Or install from source:
+
+```bash
+cd packages/pdf-image-extractor
+pip install -e .
+```
+
+## Quick Start
+
+```python
+from pdf_image_extractor import extract_images
+
+# Extract images from a PDF
+result = extract_images("document.pdf", output_dir="./images")
+
+print(f"Extracted {result.kept} images from {result.pages_processed} pages")
+
+for img in result.images:
+    print(f"  Page {img.page}: {img.filename} ({img.width}x{img.height})")
+```
+
+## Advanced Usage
+
+### Custom Configuration
+
+```python
+from pdf_image_extractor import ImageExtractor, ImageFilterConfig
+
+# Create custom config
+config = ImageFilterConfig(
+    min_width=200,              # Minimum 200px width
+    min_height=200,             # Minimum 200px height
+    min_file_size=5120,         # Minimum 5KB
+    min_page_ratio_width=0.1,   # At least 10% of page width
+    min_page_ratio_height=0.1,  # At least 10% of page height
+    margin_top=0.08,            # Skip top 8% of page
+    margin_bottom=0.08,         # Skip bottom 8% of page
+)
+
+extractor = ImageExtractor(config=config)
+result = extractor.extract("document.pdf", output_dir="./images")
+```
+
+### Vision Model Filtering
+
+Use AI to distinguish content images from decorative elements. Two providers are supported:
+
+#### OpenAI (GPT-4o-mini)
+
+```python
+from pdf_image_extractor import extract_images
+
+result = extract_images(
+    "document.pdf",
+    output_dir="./images",
+    config={
+        "use_vision_model": True,
+        "vision_provider": "openai",
+        "vision_api_key": "your-openai-api-key",
+        "vision_model": "gpt-4o-mini",  # default for OpenAI
+    }
+)
+```
+
+#### Dashscope (Qwen3-VL-Plus)
+
+Use Alibaba Cloud's Dashscope API with the Qwen3-VL-Plus vision model, which is well-suited for Chinese-language academic and technical documents:
+
+```python
+from pdf_image_extractor import extract_images
+
+result = extract_images(
+    "document.pdf",
+    output_dir="./images",
+    config={
+        "use_vision_model": True,
+        "vision_provider": "dashscope",
+        "vision_api_key": "your-dashscope-api-key",
+        "vision_model": "qwen3-vl-plus",  # default for Dashscope
+    }
+)
+```
+
+> **Tip:** Set the `DASHSCOPE_API_KEY` environment variable instead of passing the key in code.
+
+### Batch Processing
+
+```python
+from pathlib import Path
+from pdf_image_extractor import ImageExtractor
+
+extractor = ImageExtractor()
+
+for pdf_path in Path("./pdfs").glob("*.pdf"):
+    output_dir = Path("./images") / pdf_path.stem
+    result = extractor.extract(pdf_path, output_dir)
+    print(f"{pdf_path.name}: {result.kept}/{result.total_found} images")
+```
+
+## Configuration Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_width` | int | 150 | Minimum image width in pixels |
+| `min_height` | int | 150 | Minimum image height in pixels |
+| `min_file_size` | int | 3072 | Minimum file size in bytes (3KB) |
+| `min_page_ratio_width` | float | 0.08 | Minimum width as fraction of page (8%) |
+| `min_page_ratio_height` | float | 0.08 | Minimum height as fraction of page (8%) |
+| `max_page_ratio_width` | float | 0.95 | Maximum width as fraction of page (95%) |
+| `max_page_ratio_height` | float | 0.95 | Maximum height as fraction of page (95%) |
+| `margin_top` | float | 0.05 | Skip top 5% of page |
+| `margin_bottom` | float | 0.05 | Skip bottom 5% of page |
+| `margin_left` | float | 0.02 | Skip left 2% of page |
+| `margin_right` | float | 0.02 | Skip right 2% of page |
+| `use_vision_model` | bool | False | Enable AI-powered filtering |
+| `vision_provider` | str | "openai" | Vision provider: "openai" or "dashscope" |
+| `vision_base_url` | str | "" | Custom API base URL (auto-set by provider) |
+| `vision_api_key` | str | "" | OpenAI API key for vision model |
+| `vision_model` | str | "gpt-4o-mini" | Vision model name (auto-selected per provider) |
+| `vision_threshold` | float | 0.7 | Confidence threshold for content images |
+| `output_format` | str | "original" | Output format: "original", "png", or "jpeg" |
+| `jpeg_quality` | int | 95 | JPEG quality (1-100) when output_format="jpeg" |
+
+## Result Structure
+
+```python
+result.to_dict()
+```
+
+Returns:
+
+```python
+{
+    "images": [
+        {
+            "filename": "page_1_img_1.png",
+            "path": "/absolute/path/to/page_1_img_1.png",
+            "page": 1,
+            "width": 800,
+            "height": 600,
+            "size": 45000,
+            "format": "png",
+        },
+        # ... more images
+    ],
+    "stats": {
+        "total_found": 25,
+        "kept": 12,
+        "filtered": 13,
+        "pages_processed": 5,
+    }
+}
+```
+
+## Filter Logic
+
+Images are filtered through these checks (in order):
+
+1. **Pixel dimensions**: Must be at least `min_width` × `min_height`
+2. **File size**: Must be at least `min_file_size` bytes
+3. **Page ratio (small)**: Must occupy at least `min_page_ratio_width` and `min_page_ratio_height` of the page
+4. **Page ratio (large)**: Must not exceed `max_page_ratio_width` and `max_page_ratio_height` (filters backgrounds)
+5. **Margin zones**: Must not be in the margin areas defined by `margin_top`, `margin_bottom`, `margin_left`, `margin_right`
+6. **Vision model** (optional): AI classification to distinguish content vs decorative images
+
+## Examples
+
+### Extract only large diagrams
+
+```python
+result = extract_images(
+    "textbook.pdf",
+    "./diagrams",
+    config={
+        "min_width": 400,
+        "min_height": 300,
+        "min_page_ratio_width": 0.3,
+        "min_page_ratio_height": 0.3,
+    }
+)
+```
+
+### Extract all images (minimal filtering)
+
+```python
+result = extract_images(
+    "document.pdf",
+    "./all_images",
+    config={
+        "min_width": 50,
+        "min_height": 50,
+        "min_file_size": 1024,
+        "min_page_ratio_width": 0.02,
+        "min_page_ratio_height": 0.02,
+        "margin_top": 0,
+        "margin_bottom": 0,
+        "margin_left": 0,
+        "margin_right": 0,
+    }
+)
+```
+
+### Convert all images to PNG
+
+```python
+result = extract_images(
+    "document.pdf",
+    "./png_images",
+    config={"output_format": "png"}
+)
+```
+
+## License
+
+MIT License - feel free to use in your projects!
+
+## Contributing
+
+Contributions welcome! Please open an issue or PR on GitHub.

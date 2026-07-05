@@ -1,0 +1,3 @@
+[console_scripts]
+pdf-image-extract = pdf_image_extractor.cli:main
+pdf-image-extract-diagrams = pdf_image_extractor.cli:diagrams_main

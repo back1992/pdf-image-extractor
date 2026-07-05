@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-image-extractor"
+version = "1.1.0"
+description = "Extract images from PDF files with smart filtering"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["pdf", "image", "extraction", "pymupdf"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "PyMuPDF>=1.24.0",
+    "Pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+vision = [
+    "openai>=1.0.0",
+]
+dashscope = [
+    "openai>=1.0.0",
+]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+pdf-image-extract = "pdf_image_extractor.cli:main"
+pdf-image-extract-diagrams = "pdf_image_extractor.cli:diagrams_main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/pdf-image-extractor"
+Repository = "https://github.com/yourusername/pdf-image-extractor"
+
+[tool.setuptools.packages.find]
+include = ["pdf_image_extractor*"]
